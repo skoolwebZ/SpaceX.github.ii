@@ -1,0 +1,42 @@
+<!DOCTYPE html><html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Infinite Galaxy Shooter (Save Progress)</title>
+<style>
+  body { margin:0; overflow:hidden; background:#000; font-family:sans-serif; }
+  canvas { display:block; margin:0 auto; background:#000; }
+  #score { position:absolute; top:10px; left:10px; font-size:24px; color:#fff; }
+  #powerup { position:absolute; top:40px; left:10px; font-size:18px; color:cyan; }
+  #lives { position:absolute; top:70px; left:10px; font-size:18px; color:red; }
+</style>
+</head>
+<body>
+<div id="score">Score: 0</div>
+<div id="powerup">Power: None</div>
+<div id="lives">Lives: 3</div>
+<canvas id="game"></canvas>
+<script>
+// Entire Infinite Galaxy Shooter code with saving progress
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+canvas.width = 400;
+canvas.height = 600;// Load saved progress let score = parseInt(localStorage.getItem('score')) || 0; let lives = parseInt(localStorage.getItem('lives')) || 3; let powerUp = localStorage.getItem('powerUp') || null; let powerTime = powerUp ? 600 : 0;
+
+let ship = {x: canvas.width/2-15, y: canvas.height-60, width:30, height:40, speed:5}; let bullets = []; let enemies = []; let powerups = []; let particles = []; let keys = []; let stars = [];
+
+for(let l=0;l<3;l++){ stars[l]=[]; for(let i=0;i<100;i++){ stars[l].push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, size: Math.random()*2+1, speed:(l+1)*0.2+Math.random()*0.3}); } }
+
+window.addEventListener('keydown', e=>keys[e.key.toLowerCase()]=true); window.addEventListener('keyup', e=>keys[e.key.toLowerCase()]=false);
+
+// Audio functions const audioCtx = new (window.AudioContext||window.webkitAudioContext)(); function beep(f=440,d=0.05){const osc=audioCtx.createOscillator(); const gain=audioCtx.createGain(); osc.type='square'; osc.frequency.value=f; osc.connect(gain); gain.connect(audioCtx.destination); gain.gain.value=0.1; osc.start(); osc.stop(audioCtx.currentTime+d);} function explosionSound(){const osc=audioCtx.createOscillator(); const gain=audioCtx.createGain(); osc.type='triangle'; osc.frequency.setValueAtTime(150,audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(20,audioCtx.currentTime+0.2); osc.connect(gain); gain.connect(audioCtx.destination); gain.gain.value=0.2; osc.start(); osc.stop(audioCtx.currentTime+0.2);}
+
+let shootCooldown=0; function shoot(){if(shootCooldown<=0){bullets.push({x: ship.x+ship.width/2, y: ship.y, size:4, speed:8}); beep(800,0.05); shootCooldown = (powerUp==='rapid')?5:15;}}
+
+function spawnEnemy(){const type = Math.random()<0.7?'basic':'fast'; const speed = type==='basic'?2+Math.random():4+Math.random()2; const width = type==='basic'?30:20; enemies.push({x: Math.random()(canvas.width-width), y:-30, width, height:width, speed, type});} setInterval(spawnEnemy,1000); function spawnPowerup(){const types=['rapid','shield','score']; powerups.push({x: Math.random()*(canvas.width-20), y:-20, size:20, type: types[Math.floor(Math.random()*types.length)], speed:2});} setInterval(spawnPowerup,15000);
+
+function colliding(a,b){ return a.x<a.x+b.width && a.x+(a.width||a.size2)>b.x && a.y<a.y+(b.height||b.size2) && a.y+(a.height||a.size*2)>b.y;} function createParticles(x,y,color){for(let i=0;i<15;i++){particles.push({x,y,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,life:20,color});}} function saveProgress(){localStorage.setItem('score', score); localStorage.setItem('lives', lives); localStorage.setItem('powerUp', powerUp);}
+
+function gameLoop(){ ctx.fillStyle='#000'; ctx.fillRect(0,0,canvas.width,canvas.height); for(let l=0;l<3;l++){for(let s of stars[l]){s.y+=s.speed; if(s.y>canvas.height) s.y=0; ctx.fillStyle='white'; ctx.beginPath(); ctx.arc(s.x,s.y,s.size,0,Math.PI2); ctx.fill();}} if(keys['a'] && ship.x>0) ship.x-=ship.speed; if(keys['d'] && ship.x+ship.width<canvas.width) ship.x+=ship.speed; if(keys['w'] && ship.y>0) ship.y-=ship.speed; if(keys['s'] && ship.y+ship.height<canvas.height) ship.y+=ship.speed; if(keys[' ']) shoot(); if(shootCooldown>0) shootCooldown--; ctx.fillStyle='#0f0'; ctx.beginPath(); ctx.moveTo(ship.x+ship.width/2, ship.y); ctx.lineTo(ship.x, ship.y+ship.height); ctx.lineTo(ship.x+ship.width, ship.y+ship.height); ctx.closePath(); ctx.fill(); if(powerUp==='shield'){ctx.strokeStyle='cyan'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(ship.x+ship.width/2,ship.y+ship.height/2,25,0,Math.PI2); ctx.stroke();} for(let i=bullets.length-1;i>=0;i--){let b=bullets[i]; b.y-=b.speed; const grad=ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,b.size2); grad.addColorStop(0,'#ff0'); grad.addColorStop(1,'rgba(255,255,0,0)'); ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(b.x,b.y,b.size,0,Math.PI2); ctx.fill(); if(b.y<-10) bullets.splice(i,1);} for(let i=enemies.length-1;i>=0;i--){let e=enemies[i]; e.y+=e.speed; if(e.type==='fast') e.x+=Math.sin(e.y/20)2; const grad=ctx.createLinearGradient(e.x,e.y,e.x+e.width,e.y+e.height); grad.addColorStop(0,'#f00'); grad.addColorStop(1,'#800'); ctx.fillStyle=grad; ctx.fillRect(e.x,e.y,e.width,e.height); for(let j=bullets.length-1;j>=0;j--){if(colliding(e,bullets[j])){explosionSound(); createParticles(e.x+e.width/2,e.y+e.height/2,'orange'); enemies.splice(i,1); bullets.splice(j,1); score+=10(powerUp==='score'?2:1); document.getElementById('score').innerText='Score: '+score; saveProgress(); break;}} if(colliding(e,ship)){if(powerUp==='shield'){enemies.splice(i,1); powerUp=null; document.getElementById('powerup').innerText='Power: None'; saveProgress();} else{enemies.splice(i,1); lives--; document.getElementById('lives').innerText='Lives: '+lives; saveProgress();}} if(e.y>canvas.height) enemies.splice(i,1);} for(let i=powerups.length-1;i>=0;i--){let p=powerups[i]; p.y+=p.speed; ctx.fillStyle=p.type==='rapid'?'cyan':p.type==='shield'?'lime':'yellow'; ctx.beginPath(); ctx.arc(p.x+p.size/2,p.y+p.size/2,p.size/2,0,Math.PI2); ctx.fill(); if(colliding(p,ship)){powerUp=p.type; powerTime=600; powerups.splice(i,1); document.getElementById('powerup').innerText='Power: '+powerUp; saveProgress();} if(p.y>canvas.height) powerups.splice(i,1);} if(powerTime>0){powerTime--; if(powerTime<=0){powerUp=null; document.getElementById('powerup').innerText='Power: None'; saveProgress();}} for(let i=particles.length-1;i>=0;i--){let p=particles[i]; ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(p.x,p.y,3,0,Math.PI2); ctx.fill(); p.x+=p.vx; p.y+=p.vy; p.life--; if(p.life<=0) particles.splice(i,1);} requestAnimationFrame(gameLoop);} gameLoop(); </script>
+
+</body>
+</html>
